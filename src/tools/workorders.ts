@@ -34,7 +34,9 @@ export function createWorkorderTools(client: LightspeedClient) {
         required: ['workorderID'],
       },
       handler: async (args: any) => {
-        const workorder = await client.get<{ Workorder: Workorder }>(`/Workorder/${args.workorderID}?load=[WorkorderItems]`);
+        const workorder = await client.get<{ Workorder: Workorder }>(`/Workorder/${args.workorderID}`, {
+          load_relations: JSON.stringify(['WorkorderItems']),
+        });
         return workorder.Workorder;
       },
     },

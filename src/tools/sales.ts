@@ -41,7 +41,9 @@ export function createSalesTools(client: LightspeedClient) {
         required: ['saleID'],
       },
       handler: async (args: any) => {
-        const sale = await client.get<{ Sale: Sale }>(`/Sale/${args.saleID}?load=[SaleLines,SalePayments]`);
+        const sale = await client.get<{ Sale: Sale }>(`/Sale/${args.saleID}`, {
+          load_relations: JSON.stringify(['SaleLines', 'SalePayments']),
+        });
         return sale.Sale;
       },
     },
@@ -96,7 +98,9 @@ export function createSalesTools(client: LightspeedClient) {
         }
         
         // Reload with lines
-        const completeSale = await client.get<{ Sale: Sale }>(`/Sale/${saleID}?load=[SaleLines]`);
+        const completeSale = await client.get<{ Sale: Sale }>(`/Sale/${saleID}`, {
+          load_relations: JSON.stringify(['SaleLines']),
+        });
         return completeSale.Sale;
       },
     },
@@ -233,7 +237,9 @@ export function createSalesTools(client: LightspeedClient) {
       },
       handler: async (args: any) => {
         // Get original sale
-        const originalSale = await client.get<{ Sale: Sale }>(`/Sale/${args.originalSaleID}?load=[SaleLines]`);
+        const originalSale = await client.get<{ Sale: Sale }>(`/Sale/${args.originalSaleID}`, {
+          load_relations: JSON.stringify(['SaleLines']),
+        });
         
         // Create refund sale
         const refund = await client.post<{ Sale: Sale }>('/Sale', {

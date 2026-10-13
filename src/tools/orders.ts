@@ -37,7 +37,9 @@ export function createOrderTools(client: LightspeedClient) {
         required: ['orderID'],
       },
       handler: async (args: any) => {
-        const order = await client.get<{ Order: Order }>(`/Order/${args.orderID}?load=[OrderLines]`);
+        const order = await client.get<{ Order: Order }>(`/Order/${args.orderID}`, {
+          load_relations: JSON.stringify(['OrderLines']),
+        });
         return order.Order;
       },
     },
@@ -89,7 +91,9 @@ export function createOrderTools(client: LightspeedClient) {
           });
         }
         
-        const completeOrder = await client.get<{ Order: Order }>(`/Order/${orderID}?load=[OrderLines]`);
+        const completeOrder = await client.get<{ Order: Order }>(`/Order/${orderID}`, {
+          load_relations: JSON.stringify(['OrderLines']),
+        });
         return completeOrder.Order;
       },
     },
