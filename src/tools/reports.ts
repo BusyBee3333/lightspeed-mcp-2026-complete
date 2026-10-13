@@ -57,7 +57,7 @@ export function createReportTools(client: LightspeedClient) {
         const params: any = { archived: false };
         if (args.categoryID) params.categoryID = args.categoryID;
         
-        const items = await client.getPaginated<Item>('/Item?load=[ItemShops]', params);
+        const items = await client.getPaginated<Item>('/Item', { ...params, load_relations: JSON.stringify(['ItemShops']) });
         
         let filteredItems = items;
         if (args.shopID) {
@@ -193,7 +193,7 @@ export function createReportTools(client: LightspeedClient) {
         const params: any = { completed: true };
         if (args.startDate) params.timeStamp = `>,${args.startDate}`;
         
-        const sales = await client.getPaginated<Sale>('/Sale?load=[SaleLines]', params);
+        const sales = await client.getPaginated<Sale>('/Sale', { ...params, load_relations: JSON.stringify(['SaleLines']) });
         const filtered = args.endDate
           ? sales.filter(s => s.createTime <= args.endDate + 'T23:59:59')
           : sales;

@@ -45,11 +45,10 @@ export function createProductTools(client: LightspeedClient) {
         required: ['itemID'],
       },
       handler: async (args: any) => {
-        let endpoint = `/Item/${args.itemID}`;
-        if (args.loadRelations?.length) {
-          endpoint += `?load=[${args.loadRelations.join(',')}]`;
-        }
-        const item = await client.get<{ Item: Item }>(endpoint);
+        const params = args.loadRelations?.length
+          ? { load_relations: JSON.stringify(args.loadRelations) }
+          : undefined;
+        const item = await client.get<{ Item: Item }>(`/Item/${args.itemID}`, params);
         return item.Item;
       },
     },
@@ -213,7 +212,9 @@ export function createProductTools(client: LightspeedClient) {
         required: ['itemID'],
       },
       handler: async (args: any) => {
-        const item = await client.get<{ Item: Item }>(`/Item/${args.itemID}?load=[ItemShops]`);
+        const item = await client.get<{ Item: Item }>(`/Item/${args.itemID}`, {
+          load_relations: JSON.stringify(['ItemShops']),
+        });
         return {
           itemID: args.itemID,
           shops: item.Item.ItemShops || [],

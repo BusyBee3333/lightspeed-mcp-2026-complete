@@ -33,7 +33,9 @@ export function createCustomerTools(client: LightspeedClient) {
         required: ['customerID'],
       },
       handler: async (args: any) => {
-        const customer = await client.get<{ Customer: Customer }>(`/Customer/${args.customerID}?load=[Contact,CreditAccount]`);
+        const customer = await client.get<{ Customer: Customer }>(`/Customer/${args.customerID}`, {
+          load_relations: JSON.stringify(['Contact', 'CreditAccount']),
+        });
         return customer.Customer;
       },
     },
@@ -151,7 +153,9 @@ export function createCustomerTools(client: LightspeedClient) {
         required: ['customerID'],
       },
       handler: async (args: any) => {
-        const customer = await client.get<{ Customer: Customer }>(`/Customer/${args.customerID}?load=[CreditAccount]`);
+        const customer = await client.get<{ Customer: Customer }>(`/Customer/${args.customerID}`, {
+          load_relations: JSON.stringify(['CreditAccount']),
+        });
         return customer.Customer.CreditAccount || { balance: 0, message: 'No credit account' };
       },
     },

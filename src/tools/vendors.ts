@@ -30,7 +30,9 @@ export function createVendorTools(client: LightspeedClient) {
         required: ['vendorID'],
       },
       handler: async (args: any) => {
-        const vendor = await client.get<{ Vendor: Vendor }>(`/Vendor/${args.vendorID}?load=[Contact]`);
+        const vendor = await client.get<{ Vendor: Vendor }>(`/Vendor/${args.vendorID}`, {
+          load_relations: JSON.stringify(['Contact']),
+        });
         return vendor.Vendor;
       },
     },
