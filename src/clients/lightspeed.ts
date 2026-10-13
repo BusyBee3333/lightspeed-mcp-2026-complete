@@ -2,10 +2,11 @@ import type {
   LightspeedConfig,
   OAuthTokenResponse,
   LightspeedError,
-  PaginatedResponse,
 } from '../types/index.js';
 
 export class LightspeedClient {
+  private static readonly RETAIL_MAX_PAGE_SIZE = 100;
+
   private config: LightspeedConfig;
   private baseUrl: string;
   private authBaseUrl: string;
@@ -149,48 +150,78 @@ export class LightspeedClient {
   }
 
   // Paginated requests
+  //
+  // Retail (R-Series) V3 uses cursor-based pagination: each response's
+  // `@attributes.next` holds the full URL of the next page (with an `after`
+  // cursor), and is empty on the last page. `offset` is no longer supported.
+  // `maxResults` caps the total returned; omit it to fetch every page.
   async getPaginated<T>(
     endpoint: string,
     params: Record<string, any> = {},
-    limit = 100
+    maxResults?: number
+  ): Promise<T[]> {
+    if (this.config.apiType === 'retail') {
+      return this.getRetailPaginated<T>(endpoint, params, maxResults);
+    }
+    return this.getRestaurantPaginated<T>(endpoint, params, maxResults);
+  }
+
+  private async getRetailPaginated<T>(
+    endpoint: string,
+    params: Record<string, any>,
+    maxResults?: number
   ): Promise<T[]> {
     const results: T[] = [];
-    let offset = 0;
-    let hasMore = true;
+    const pageSize = Math.min(LightspeedClient.RETAIL_MAX_PAGE_SIZE, maxResults ?? Infinity);
+    let response = await this.get<any>(endpoint, { ...params, limit: pageSize });
 
-    while (hasMore) {
-      const pageParams = {
-        ...params,
-        limit,
-        offset,
-      };
+    while (true) {
+      results.push(...this.extractRetailRecords<T>(response));
 
-      const response = await this.get<any>(endpoint, pageParams);
-      
-      // Handle Retail API pagination
-      if (response['@attributes']) {
-        const data = Array.isArray(response[Object.keys(response).find(k => k !== '@attributes')!])
-          ? response[Object.keys(response).find(k => k !== '@attributes')!]
-          : [response[Object.keys(response).find(k => k !== '@attributes')!]];
-        
-        results.push(...data);
-        
-        const count = parseInt(response['@attributes'].count);
-        hasMore = offset + limit < count;
-        offset += limit;
-      } 
-      // Handle Restaurant API pagination
-      else if (Array.isArray(response)) {
-        results.push(...response);
-        hasMore = response.length === limit;
-        offset += limit;
-      } else {
-        results.push(response);
-        hasMore = false;
+      const next: string | undefined = response?.['@attributes']?.next;
+      if (!next || (maxResults !== undefined && results.length >= maxResults)) {
+        break;
       }
+      // The next URL already carries the original query params plus the cursor
+      response = await this.requestUrl<any>('GET', next);
     }
 
-    return results;
+    return maxResults !== undefined ? results.slice(0, maxResults) : results;
+  }
+
+  // Retail wraps records under a resource key (e.g. `Item`), returning a bare
+  // object for a single match and omitting the key entirely for no matches.
+  private extractRetailRecords<T>(response: any): T[] {
+    if (!response || typeof response !== 'object') return [];
+    const key = Object.keys(response).find(k => k !== '@attributes');
+    if (!key) return [];
+    const value = response[key];
+    return Array.isArray(value) ? value : [value];
+  }
+
+  private async getRestaurantPaginated<T>(
+    endpoint: string,
+    params: Record<string, any>,
+    maxResults?: number
+  ): Promise<T[]> {
+    const results: T[] = [];
+    const limit = 100;
+    let offset = 0;
+
+    while (true) {
+      const response = await this.get<any>(endpoint, { ...params, limit, offset });
+      if (!Array.isArray(response)) {
+        results.push(response);
+        break;
+      }
+      results.push(...response);
+      if (response.length < limit || (maxResults !== undefined && results.length >= maxResults)) {
+        break;
+      }
+      offset += limit;
+    }
+
+    return maxResults !== undefined ? results.slice(0, maxResults) : results;
   }
 
   // Core request method with retry logic
@@ -200,10 +231,6 @@ export class LightspeedClient {
     body?: any,
     params?: Record<string, any>
   ): Promise<T> {
-    if (!this.config.accessToken) {
-      throw new Error('No access token available. Please authenticate first.');
-    }
-
     let url = this.config.apiType === 'retail'
       ? `${this.baseUrl}/Account/${this.config.accountId}${endpoint}.json`
       : `${this.baseUrl}${endpoint}`;
@@ -216,6 +243,14 @@ export class LightspeedClient {
         }
       }
       url += `?${searchParams}`;
+    }
+
+    return this.requestUrl<T>(method, url, body);
+  }
+
+  private async requestUrl<T>(method: string, url: string, body?: any): Promise<T> {
+    if (!this.config.accessToken) {
+      throw new Error('No access token available. Please authenticate first.');
     }
 
     const headers: Record<string, string> = {

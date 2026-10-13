@@ -18,11 +18,11 @@ export interface OAuthTokenResponse {
   scope?: string;
 }
 
+// Retail V3 cursor pagination: follow `next` until it is empty
 export interface PaginatedResponse<T> {
   '@attributes': {
-    count: string;
-    offset: string;
-    limit: string;
+    next: string;
+    previous: string;
   };
   data: T[];
 }
